@@ -475,6 +475,57 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
+def _():
+    def score_heats(text):
+        """Parse heat-results CSV (one row per heat: first_id, second_id, third_id,
+        winner_time; a header row is auto-skipped) and rank cars by WINNER-TIME scoring:
+        cars that won >=1 heat are ordered by average winning time (fastest first);
+        cars that never won fall below, ordered by placement points. Returns a dict
+        with rows, the ordered car list, and per-car points/wins/avg-time."""
+        rows = []
+        for ln in (text or "").splitlines():
+            ln = ln.strip()
+            if not ln:
+                continue
+            parts = [p.strip() for p in ln.split(",")]
+            if len(parts) < 4:
+                continue
+            try:
+                tm = float(parts[3])
+            except ValueError:
+                continue                       # skips a header row
+            rows.append((parts[0], parts[1], parts[2], tm))
+        pts = {}; wins = {}; wsum = {}
+        def bump(d, k, v): d[k] = d.get(k, 0) + v
+        for f, s, t, tm in rows:
+            bump(pts, f, 1); bump(pts, s, 2); bump(pts, t, 3)
+            bump(wins, f, 1); bump(wsum, f, tm)
+        cars = sorted(pts)
+        def avg(c): return (wsum[c] / wins[c]) if wins.get(c) else None
+        timed   = sorted([c for c in cars if wins.get(c)],     key=lambda c: (avg(c), pts[c]))
+        untimed = sorted([c for c in cars if not wins.get(c)], key=lambda c: (pts[c], c))
+        return dict(rows=rows, order=timed + untimed, pts=pts, wins=wins,
+                    avg={c: avg(c) for c in cars})
+
+
+    def standings_md(s, mark_top=0):
+        """Render a standings dict from `score_heats` as a markdown table. If
+        `mark_top` > 0, flag the top-N rows with a checkmark column."""
+        hdr = ("| Rank | Car | Wins | Avg win time | Place pts |" + (" Advances |" if mark_top else "") + "\n"
+               "|--:|:--|--:|--:|--:|" + (":--:|" if mark_top else "") + "\n")
+        out = []
+        for i, c in enumerate(s["order"]):
+            a = s["avg"][c]
+            row = f"| {i+1} | {c} | {s['wins'].get(c, 0)} | {('%.3f' % a) if a is not None else '—'} | {s['pts'][c]} |"
+            if mark_top:
+                row += f" {'✅' if i < mark_top else ''} |"
+            out.append(row)
+        return hdr + "\n".join(out)
+
+    return score_heats, standings_md
+
+
+@app.cell(hide_code=True)
 def _(mo):
     results_csv = mo.ui.text_area(
         value="",
@@ -488,55 +539,65 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(mo, results_csv):
-    _rows = []
-    for _ln in (results_csv.value or "").splitlines():
-        _ln = _ln.strip()
-        if not _ln:
-            continue
-        _parts = [p.strip() for p in _ln.split(",")]
-        if len(_parts) < 4:
-            continue
-        try:
-            _tm = float(_parts[3])
-        except ValueError:
-            continue                     # silently skips a header row
-        _rows.append((_parts[0], _parts[1], _parts[2], _tm))
-
-    if not _rows:
+def _(mo, results_csv, score_heats, standings_md):
+    _s = score_heats(results_csv.value)
+    if not _s["rows"]:
         _out = mo.callout(
-            mo.md("Paste heat results above as CSV to compute standings and the second-round list."),
+            mo.md("Paste round-1 heat results above as CSV to compute standings and the second-round list."),
             kind="info")
     else:
-        _pts = {}; _wins = {}; _wsum = {}
-        def _bump(d, k, v): d[k] = d.get(k, 0) + v
-        for _f, _s, _t, _tm in _rows:
-            _bump(_pts, _f, 1); _bump(_pts, _s, 2); _bump(_pts, _t, 3)
-            _bump(_wins, _f, 1); _bump(_wsum, _f, _tm)
-        _cars = sorted(_pts)
-        _avg = lambda c: (_wsum[c] / _wins[c]) if _wins.get(c) else None
-        _timed   = sorted([c for c in _cars if _wins.get(c)],     key=lambda c: (_avg(c), _pts[c]))
-        _untimed = sorted([c for c in _cars if not _wins.get(c)], key=lambda c: (_pts[c], c))
-        _order = _timed + _untimed
-        _k = min(6, len(_order))
-        _second = _order[:_k]
-
-        _hdr = ("| Rank | Car | Wins | Avg win time | Place pts | 2nd round |\n"
-                "|--:|:--|--:|--:|--:|:--:|\n")
-        _body = "\n".join(
-            f"| {_i+1} | {_c} | {_wins.get(_c,0)} | "
-            f"{('%.3f' % _avg(_c)) if _avg(_c) is not None else '—'} | {_pts[_c]} | "
-            f"{'✅' if _i < _k else ''} |"
-            for _i, _c in enumerate(_order))
-
+        _o = _s["order"]; _k = min(6, len(_o)); _second = _o[:_k]
         _out = mo.vstack([
-            mo.callout(
-                mo.md("**🏁 Second round — race these cars:**\n\n## "
-                      + "  ".join(f"`{c}`" for c in _second)),
-                kind="success"),
-            mo.md(f"**Full standings** — {len(_rows)} heats, {len(_cars)} cars "
+            mo.callout(mo.md("**🏁 Second round — race these cars:**\n\n## "
+                             + "  ".join(f"`{c}`" for c in _second)), kind="success"),
+            mo.md(f"**Round-1 standings** — {len(_s['rows'])} heats, {len(_s['pts'])} cars "
                   f"(winner-time scoring; ✅ = advances to the {_k}-car second round)"),
-            mo.md(_hdr + _body),
+            mo.md(standings_md(_s, mark_top=_k)),
+        ])
+    _out
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## 🏆 Crown the winners — second-round results
+
+    Run the **6-car second round** the same way: a sliding window of three over the
+    six finalists (heats `{1,2,3}, {2,3,4}, … {6,1,2}`), so each finalist races three
+    times, once per lane. Record the same CSV and paste it below — the top three by
+    winner-time scoring are your **podium**.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    final_csv = mo.ui.text_area(
+        value="",
+        placeholder="first_place_id, second_place_id, third_place_id, winner_time\n12, 7, 3, 2.471\n7, 3, 19, 2.488\n...",
+        label="Second-round results CSV",
+        rows=10,
+        full_width=True,
+    )
+    final_csv
+    return (final_csv,)
+
+
+@app.cell(hide_code=True)
+def _(final_csv, mo, score_heats, standings_md):
+    _f = score_heats(final_csv.value)
+    if not _f["rows"]:
+        _out = mo.callout(
+            mo.md("Paste the **second-round** heat results above to crown the podium."),
+            kind="info")
+    else:
+        _o = _f["order"]; _medals = ["🥇 1st place", "🥈 2nd place", "🥉 3rd place"]
+        _pod = "\n\n".join(f"## {_medals[i]} — `{_o[i]}`" for i in range(min(3, len(_o))))
+        _out = mo.vstack([
+            mo.callout(mo.md("# 🏆 Final podium\n\n" + _pod), kind="success"),
+            mo.md(f"**Second-round standings** — {len(_f['rows'])} heats, {len(_f['pts'])} cars"),
+            mo.md(standings_md(_f)),
         ])
     _out
     return
