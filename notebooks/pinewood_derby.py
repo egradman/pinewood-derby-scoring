@@ -399,6 +399,8 @@ def _(mo):
     ## 🏁 How to run the event — operations guide
 
     A start-to-finish checklist for race day, reflecting what the simulation shows.
+    We assume the finish-line **sensor is accurate** — its times are trustworthy and
+    directly comparable across lanes (no per-lane correction needed).
 
     ### Before the event
     - **Confirm the field.** Count cars (`N`). Every car will race exactly **3 times**,
@@ -410,21 +412,20 @@ def _(mo):
       numbered `k, k+1, k+2`, wrapping past `N` back to `1`. Put the lower number in
       **lane A**, middle in **B**, higher in **C**. This guarantees every car runs
       each lane once.
-    - **Check the sensor.** Verify the finish-line timer triggers on the winning car
-      and logs a time. Do a dry run; note any per-lane offset (a "lane bias") so it
-      can be subtracted.
+    - **Check the sensor.** Do a dry run to confirm the finish-line timer fires
+      reliably on the winning car and logs a clean time.
 
     ### Running the heats
     - Run heats **in order**, 1 through `N`. Release all three cars together.
     - For each heat, record: **finishing order** (1st/2nd/3rd) *and* the
-      **winner's sensor time** plus **which lane** the winner was in.
+      **winner's sensor time**.
     - If the sensor misses a heat, fall back to placement for that heat only and note it.
 
     ### Scoring  (use the sensor — it's the big win)
-    - **Primary (this year): winner-time ranking.** For each car, average the
-      sensor times from the heats it **won**, after subtracting that lane's known
-      bias. Rank cars **fastest average winning time → slowest**. Cars that never won
-      a heat are placed below the winners, ordered by their placement points.
+    - **Primary (this year): winner-time ranking.** For each car, average the sensor
+      times from the heats it **won**, and rank cars **fastest average winning time →
+      slowest**. Cars that never won a heat are placed below the winners, ordered by
+      their placement points.
     - **Why:** in simulation this roughly **doubles** the chance of getting the right
       three cars on the podium and **triples** the chance of the exact 1-2-3 order,
       versus placement-only — with **no extra heats**. The faster a car, the more
@@ -438,7 +439,9 @@ def _(mo):
       heat** among the tied cars and rank by the run-off result.
 
     ### If you want extra confidence in the podium (optional second round)
-    - **With the sensor:** usually unnecessary — the times already settle it.
+    - **With the sensor:** usually unnecessary — the times already settle it. A
+      **6-car second round** (re-race the top six against each other) buys a few more
+      points of accuracy if you want it.
     - **Without the sensor:** run a **championship round** — re-race just the **top
       4-6 cars** (by first-round standings) against each other, and use that round to
       order the podium. This is the best use of one extra pass; re-racing the whole
