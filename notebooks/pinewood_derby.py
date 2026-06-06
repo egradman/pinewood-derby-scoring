@@ -44,6 +44,29 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ## TL;DR — yes, use the sensor ✅
+
+    Scoring by the sensor's **winning times** instead of just finishing places makes
+    the podium dramatically more accurate, with no extra racing — and a small **6-car
+    second round** squeezes out a bit more. Measured over 20,000 simulated events
+    (24 cars, realistic heat-to-heat variation):
+
+    | Method | Right 3 cars | Exact 1-2-3 | Correct winner |
+    |---|--:|--:|--:|
+    | **Old** — placement only *(past years)* | 37% | 17% | 67% |
+    | **New** — sensor winning times | **76%** | **50%** | **82%** |
+    | New + 6-car second round | **83%** | **62%** | **89%** |
+
+    **Bottom line:** it's definitely worth using the sensor as-built — it roughly
+    *doubles* the odds of crowning the right three cars — and probably worth running a
+    **6-car second round** on top for the extra accuracy.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ## How the simulation works (in plain terms)
 
     Think of it like rolling dice thousands of times to learn the odds:
