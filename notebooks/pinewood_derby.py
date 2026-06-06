@@ -455,5 +455,92 @@ def _(mo):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ---
+    # 🟢 Live scoring (race day)
+
+    Paste your heat results below, **one row per heat**, as CSV:
+
+    ```
+    first_place_id, second_place_id, third_place_id, winner_time
+    ```
+
+    A header row is optional. Scoring uses the **winner-time** method (rank by each
+    car's average winning time; cars that never won fall below, ordered by placement
+    points). The notebook returns the **standings** and the **6 cars for the second round**.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    results_csv = mo.ui.text_area(
+        value="",
+        placeholder="first_place_id, second_place_id, third_place_id, winner_time\n12, 7, 3, 2.481\n7, 3, 19, 2.493\n3, 19, 5, 2.520\n...",
+        label="Heat results CSV",
+        rows=12,
+        full_width=True,
+    )
+    results_csv
+    return (results_csv,)
+
+
+@app.cell(hide_code=True)
+def _(mo, results_csv):
+    _rows = []
+    for _ln in (results_csv.value or "").splitlines():
+        _ln = _ln.strip()
+        if not _ln:
+            continue
+        _parts = [p.strip() for p in _ln.split(",")]
+        if len(_parts) < 4:
+            continue
+        try:
+            _tm = float(_parts[3])
+        except ValueError:
+            continue                     # silently skips a header row
+        _rows.append((_parts[0], _parts[1], _parts[2], _tm))
+
+    if not _rows:
+        _out = mo.callout(
+            mo.md("Paste heat results above as CSV to compute standings and the second-round list."),
+            kind="info")
+    else:
+        _pts = {}; _wins = {}; _wsum = {}
+        def _bump(d, k, v): d[k] = d.get(k, 0) + v
+        for _f, _s, _t, _tm in _rows:
+            _bump(_pts, _f, 1); _bump(_pts, _s, 2); _bump(_pts, _t, 3)
+            _bump(_wins, _f, 1); _bump(_wsum, _f, _tm)
+        _cars = sorted(_pts)
+        _avg = lambda c: (_wsum[c] / _wins[c]) if _wins.get(c) else None
+        _timed   = sorted([c for c in _cars if _wins.get(c)],     key=lambda c: (_avg(c), _pts[c]))
+        _untimed = sorted([c for c in _cars if not _wins.get(c)], key=lambda c: (_pts[c], c))
+        _order = _timed + _untimed
+        _k = min(6, len(_order))
+        _second = _order[:_k]
+
+        _hdr = ("| Rank | Car | Wins | Avg win time | Place pts | 2nd round |\n"
+                "|--:|:--|--:|--:|--:|:--:|\n")
+        _body = "\n".join(
+            f"| {_i+1} | {_c} | {_wins.get(_c,0)} | "
+            f"{('%.3f' % _avg(_c)) if _avg(_c) is not None else '—'} | {_pts[_c]} | "
+            f"{'✅' if _i < _k else ''} |"
+            for _i, _c in enumerate(_order))
+
+        _out = mo.vstack([
+            mo.callout(
+                mo.md("**🏁 Second round — race these cars:**\n\n## "
+                      + "  ".join(f"`{c}`" for c in _second)),
+                kind="success"),
+            mo.md(f"**Full standings** — {len(_rows)} heats, {len(_cars)} cars "
+                  f"(winner-time scoring; ✅ = advances to the {_k}-car second round)"),
+            mo.md(_hdr + _body),
+        ])
+    _out
+    return
+
+
 if __name__ == "__main__":
     app.run()
