@@ -461,10 +461,10 @@ def _(mo):
     ---
     # 🟢 Live scoring (race day)
 
-    Paste your heat results below, **one row per heat**, as CSV:
+    Paste your heat results below, **one row per heat**, whitespace-separated:
 
     ```
-    first_place_id, second_place_id, third_place_id, winner_time
+    first_place_id  second_place_id  third_place_id  winner_time
     ```
 
     A header row is optional. Scoring uses the **winner-time** method (rank by each
@@ -477,17 +477,15 @@ def _(mo):
 @app.cell(hide_code=True)
 def _():
     def score_heats(text):
-        """Parse heat-results CSV (one row per heat: first_id, second_id, third_id,
-        winner_time; a header row is auto-skipped) and rank cars by WINNER-TIME scoring:
-        cars that won >=1 heat are ordered by average winning time (fastest first);
-        cars that never won fall below, ordered by placement points. Returns a dict
-        with rows, the ordered car list, and per-car points/wins/avg-time."""
+        """Parse heat-results data (one row per heat: first_id, second_id, third_id,
+        winner_time; whitespace-separated; a header row is auto-skipped) and rank
+        cars by WINNER-TIME scoring: cars that won >=1 heat are ordered by average
+        winning time (fastest first); cars that never won fall below, ordered by
+        placement points. Returns a dict with rows, the ordered car list, and
+        per-car points/wins/avg-time."""
         rows = []
         for ln in (text or "").splitlines():
-            ln = ln.strip()
-            if not ln:
-                continue
-            parts = [p.strip() for p in ln.split(",")]
+            parts = ln.split()
             if len(parts) < 4:
                 continue
             try:
@@ -529,8 +527,8 @@ def _():
 def _(mo):
     results_csv = mo.ui.text_area(
         value="",
-        placeholder="first_place_id, second_place_id, third_place_id, winner_time\n12, 7, 3, 2.481\n7, 3, 19, 2.493\n3, 19, 5, 2.520\n...",
-        label="Heat results CSV",
+        placeholder="first_place_id  second_place_id  third_place_id  winner_time\n12  7  3  2.481\n7  3  19  2.493\n3  19  5  2.520\n...",
+        label="Heat results",
         rows=12,
         full_width=True,
     )
@@ -575,8 +573,8 @@ def _(mo):
 def _(mo):
     final_csv = mo.ui.text_area(
         value="",
-        placeholder="first_place_id, second_place_id, third_place_id, winner_time\n12, 7, 3, 2.471\n7, 3, 19, 2.488\n...",
-        label="Second-round results CSV",
+        placeholder="first_place_id  second_place_id  third_place_id  winner_time\n12  7  3  2.471\n7  3  19  2.488\n...",
+        label="Second-round results",
         rows=10,
         full_width=True,
     )
